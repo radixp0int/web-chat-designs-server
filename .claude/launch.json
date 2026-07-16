@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "chat-ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/christiansifuentes/Developer/temp/chat-designs/chat-interfaces", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

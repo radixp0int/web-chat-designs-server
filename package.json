@@ -1,0 +1,21 @@
+{
+  "name": "chat-ws-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mock WebSocket server that streams fake LLM events to the chat-interfaces UI.",
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/server.ts",
+    "start": "node --experimental-strip-types src/server.ts",
+    "smoke": "node --experimental-strip-types scripts/smoke-client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.7.0"
+  }
+}
