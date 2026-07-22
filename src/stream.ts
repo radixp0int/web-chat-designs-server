@@ -4,7 +4,7 @@
 // chunks, monotonic per-stream chunk indexes, and timestamps. Scenarios stay
 // declarative — just text and tool descriptions.
 
-import type { ToolStatus, WSEvent, WSSource } from './types.ts';
+import type { ToolStatus, WSEvent, WSHighlight, WSSource } from './types.ts';
 
 /** One step of a scenario, in the order it should play out. */
 export type ScenarioStep =
@@ -25,6 +25,9 @@ export type ScenarioStep =
       text: string;
       /** Reference docs cited by this answer; delivered on the summary event. */
       sources?: WSSource[];
+      /** Supporting passages to highlight on citation click; each section's
+       *  offsets index its own source markdown (keyed by referenceNumber). */
+      highlights?: WSHighlight[];
     }
   | { kind: 'error'; message: string; code?: string; recoverable: boolean };
 
@@ -90,6 +93,7 @@ export async function runScenario(
   const thoughtParts: string[] = [];
   const answerParts: string[] = [];
   const answerSources: WSSource[] = [];
+  const answerHighlights: WSHighlight[] = [];
 
   try {
     await sleep(jitter(PACING.beforeFirstEvent), signal);
@@ -136,6 +140,9 @@ export async function runScenario(
           }
           answerParts.push(step.text);
           if (step.sources) answerSources.push(...step.sources);
+          // Highlight offsets index each source's own markdown, so they pass
+          // through as-is (no answer-relative shift).
+          if (step.highlights) answerHighlights.push(...step.highlights);
           break;
         }
         case 'error': {
@@ -162,6 +169,7 @@ export async function runScenario(
         type: 'summary',
         text: answerParts.join(''),
         sources: answerSources.length ? answerSources : undefined,
+        highlights: answerHighlights.length ? answerHighlights : undefined,
         ...base(),
       });
     }

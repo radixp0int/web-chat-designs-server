@@ -9,8 +9,12 @@
 //   "cite"/"source"/"save" → an answer citing a handful of references
 //   anything else          → cycles through the default scenarios
 
-import { financeSources, makeStressSources } from './citations.ts';
+import { financeSources, makeStressSources, sourceHighlights } from './citations.ts';
 import type { Scenario } from './stream.ts';
+
+// The stress corpus is deterministic, so one instance is reused for both the
+// scenario's sources and its highlight-offset lookups.
+const stressSources = makeStressSources(50);
 
 const toolHeavy: Scenario = [
   {
@@ -106,6 +110,15 @@ const citations: Scenario = [
     kind: 'answer',
     text: 'Here is a straightforward way to think about it.\n\nAutomating a transfer on payday matters more than the exact amount [3], because consistency beats optimization at this stage. A practical split many people use:\n\n1. Keep one month of expenses in checking as a buffer [1].\n2. Direct new savings to a high-yield account until you reach your target — rates vary widely between providers [2].\n3. Only after that, route the overflow toward investing or extra debt payments [4].\n\nMost people land on a three-to-six-month emergency fund [1]. Tell me your monthly surplus and I can turn this into a schedule.',
     sources: financeSources,
+    // Offsets index each source's own markdown. Reference 1 gets two sections
+    // to show one source highlighting multiple passages.
+    highlights: sourceHighlights(financeSources, [
+      { referenceNumber: 1, phrase: 'the right number depends on income stability, household structure' },
+      { referenceNumber: 1, phrase: 'An emergency fund is insurance, not an investment' },
+      { referenceNumber: 2, phrase: 'APYs move with the federal funds rate' },
+      { referenceNumber: 3, phrase: 'Money moved before it reaches the spending account' },
+      { referenceNumber: 4, phrase: 'even while attacking debt' },
+    ]),
   },
 ];
 
@@ -119,7 +132,13 @@ const citationsStress: Scenario = [
   {
     kind: 'answer',
     text: 'Here is a synthesis drawn from a **50-document corpus** — the point here is navigation, so the citations jump around on purpose.\n\nThe headline series sits near its five-year median [3], though the fee data tells a different story [17]. Rate dispersion is widest in the upper band [8], and the pattern repeats across the quarterly cuts [23]. The checklist docs [11] and [29] both flag quarter-over-quarter moves beyond their thresholds — compare them against the summary in [36].\n\nThe tail of the corpus is where the caveats live: methodology notes [42], the confidence table [47], and the final reconciliation [50].\n\nJump between [3] and [50] to feel the navigation.',
-    sources: makeStressSources(50),
+    sources: stressSources,
+    highlights: sourceHighlights(stressSources, [
+      { referenceNumber: 3, phrase: 'generated reference documents in the stress-test corpus' },
+      { referenceNumber: 8, phrase: 'This working note supports answer marker' },
+      { referenceNumber: 8, phrase: 'generated reference documents in the stress-test corpus' },
+      { referenceNumber: 50, phrase: 'This working note supports answer marker' },
+    ]),
   },
 ];
 

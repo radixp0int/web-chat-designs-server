@@ -53,6 +53,23 @@ export interface WSSource {
   markdown: string;
 }
 
+/** One passage to highlight, as character offsets into the source document's
+ *  markdown. `idx` is a stable per-section id (not a reference), used only as a
+ *  key. */
+export interface WSHighlightSection {
+  idx: number;
+  start: number;
+  end: number;
+}
+
+/** The passages of a cited source to highlight. `referenceNumber` is the source
+ *  id (the [n] marker the chip shows); opening that reference highlights every
+ *  section here. One source can own several sections. */
+export interface WSHighlight {
+  referenceNumber: number;
+  sections: WSHighlightSection[];
+}
+
 /** A small chunk of the final answer. */
 export interface TokenEvent extends StreamChunk {
   type: 'token';
@@ -74,6 +91,8 @@ export interface SummaryEvent extends StreamComplete {
   type: 'summary';
   /** References backing this answer, resolved by their inline [n] markers. */
   sources?: WSSource[];
+  /** Passages to highlight in the cited source docs, keyed by referenceNumber. */
+  highlights?: WSHighlight[];
 }
 
 /** Where a tool call is in its life. */

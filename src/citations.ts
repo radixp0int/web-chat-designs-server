@@ -3,7 +3,34 @@
 // originate server-side. Inline [n] markers in the answer text resolve to a
 // source `id` here.
 
-import type { WSSource } from './types.ts';
+import type { WSHighlight, WSSource } from './types.ts';
+
+/**
+ * Turns `{ referenceNumber, phrase }` specs into the nested highlight shape by
+ * locating each phrase in the matching source's markdown (the source whose `id`
+ * equals `referenceNumber`). Sections are grouped by `referenceNumber` and each
+ * gets a unique running `idx`. Authoring by phrase keeps the mock data correct
+ * without hand-counting offsets — positions are derived from the source
+ * markdown itself. A phrase that isn't found is skipped.
+ */
+export function sourceHighlights(
+  sources: WSSource[],
+  specs: { referenceNumber: number; phrase: string }[],
+): WSHighlight[] {
+  const groups = new Map<number, WSHighlight>();
+  let idx = 1;
+  for (const { referenceNumber, phrase } of specs) {
+    const source = sources.find((s) => s.id === referenceNumber);
+    if (!source) continue;
+    const start = source.markdown.indexOf(phrase);
+    if (start === -1) continue;
+    const section = { idx: idx++, start, end: start + phrase.length };
+    const group = groups.get(referenceNumber);
+    if (group) group.sections.push(section);
+    else groups.set(referenceNumber, { referenceNumber, sections: [section] });
+  }
+  return [...groups.values()];
+}
 
 /** A small finance corpus for the citations demo answer. */
 export const financeSources: WSSource[] = [
