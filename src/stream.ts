@@ -25,6 +25,15 @@ export type ScenarioStep =
       text: string;
       /** Reference docs cited by this answer; delivered on the summary event. */
       sources?: WSSource[];
+<<<<<<< Updated upstream
+=======
+      /** Supporting passages to highlight on citation click; each section's
+       *  offsets index its own source markdown (keyed by referenceNumber). */
+      highlights?: WSHighlight[];
+      /** Suggested next prompts, phrased as the user would type them;
+       *  delivered on the summary event. */
+      followups?: string[];
+>>>>>>> Stashed changes
     }
   | { kind: 'error'; message: string; code?: string; recoverable: boolean };
 
@@ -90,6 +99,11 @@ export async function runScenario(
   const thoughtParts: string[] = [];
   const answerParts: string[] = [];
   const answerSources: WSSource[] = [];
+<<<<<<< Updated upstream
+=======
+  const answerHighlights: WSHighlight[] = [];
+  const answerFollowups: string[] = [];
+>>>>>>> Stashed changes
 
   try {
     await sleep(jitter(PACING.beforeFirstEvent), signal);
@@ -136,6 +150,13 @@ export async function runScenario(
           }
           answerParts.push(step.text);
           if (step.sources) answerSources.push(...step.sources);
+<<<<<<< Updated upstream
+=======
+          // Highlight offsets index each source's own markdown, so they pass
+          // through as-is (no answer-relative shift).
+          if (step.highlights) answerHighlights.push(...step.highlights);
+          if (step.followups) answerFollowups.push(...step.followups);
+>>>>>>> Stashed changes
           break;
         }
         case 'error': {
@@ -162,6 +183,11 @@ export async function runScenario(
         type: 'summary',
         text: answerParts.join(''),
         sources: answerSources.length ? answerSources : undefined,
+<<<<<<< Updated upstream
+=======
+        highlights: answerHighlights.length ? answerHighlights : undefined,
+        followups: answerFollowups.length ? answerFollowups : undefined,
+>>>>>>> Stashed changes
         ...base(),
       });
     }

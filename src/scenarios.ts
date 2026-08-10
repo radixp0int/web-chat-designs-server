@@ -34,6 +34,11 @@ const toolHeavy: Scenario = [
   {
     kind: 'answer',
     text: 'Here is where things stand as of yesterday’s close.\n\nThe fed funds rate sits at 4.25% and the 10-year Treasury yields 3.98%, so the curve remains mildly inverted at the short end. Over the past month broad equities (SPY) added about 2.4% while core bonds (AGG) gained 0.6%.\n\nFor a balanced portfolio that mix argues for staying the course: equities are doing the growth work while bonds are finally paying you to wait. If you tell me your current allocation, I can sketch what a rebalance would look like.',
+    followups: [
+      'I’m at 70% stocks and 30% bonds — what should I rebalance?',
+      'Why is the curve still inverted?',
+      'Is it worth locking in the 10-year now?',
+    ],
   },
 ];
 
@@ -45,6 +50,11 @@ const plain: Scenario = [
   {
     kind: 'answer',
     text: 'Compound interest is interest that earns interest. Each period, returns are calculated on your original principal plus everything it has already earned, so growth accelerates rather than staying linear.\n\nA quick example: $10,000 growing at 7% a year becomes about $19,700 after 10 years — but about $76,100 after 30. The last decade alone adds more than the first two combined, which is why starting early matters more than starting big.\n\nThe practical takeaway: time in the market is the one input you can’t buy back later.',
+    followups: [
+      'Run that example again starting at 40 instead of 25',
+      'What return rate should I actually plan around?',
+      'How much would a 1% fee cost me over 30 years?',
+    ],
   },
 ];
 
@@ -75,6 +85,10 @@ const toolFailure: Scenario = [
   {
     kind: 'answer',
     text: 'The live quote service timed out on me, so this is the latest cached close rather than a real-time price: VTI last traded at $289.44 as of yesterday’s market close.\n\nFor deciding whether to place a market order right now you’d want a fresh quote from your brokerage, but for allocation math a day-old close is more than accurate enough.',
+    followups: [
+      'Try the live quote again',
+      'How stale is too stale for allocation math?',
+    ],
   },
 ];
 
@@ -106,6 +120,24 @@ const citations: Scenario = [
     kind: 'answer',
     text: 'Here is a straightforward way to think about it.\n\nAutomating a transfer on payday matters more than the exact amount [3], because consistency beats optimization at this stage. A practical split many people use:\n\n1. Keep one month of expenses in checking as a buffer [1].\n2. Direct new savings to a high-yield account until you reach your target — rates vary widely between providers [2].\n3. Only after that, route the overflow toward investing or extra debt payments [4].\n\nMost people land on a three-to-six-month emergency fund [1]. Tell me your monthly surplus and I can turn this into a schedule.',
     sources: financeSources,
+<<<<<<< Updated upstream
+=======
+    // Offsets index each source's own markdown. Reference 1 gets two sections
+    // to show one source highlighting multiple passages.
+    highlights: sourceHighlights(financeSources, [
+      { referenceNumber: 1, phrase: 'the right number depends on income stability, household structure' },
+      { referenceNumber: 1, phrase: 'An emergency fund is insurance, not an investment' },
+      { referenceNumber: 2, phrase: 'APYs move with the federal funds rate' },
+      { referenceNumber: 3, phrase: 'Money moved before it reaches the spending account' },
+      { referenceNumber: 4, phrase: 'even while attacking debt' },
+    ]),
+    followups: [
+      'My surplus is $600 a month — turn this into a schedule',
+      'Should I pay down my card debt before saving?',
+      'How do I pick a high-yield account?',
+      'What counts as an emergency?',
+    ],
+>>>>>>> Stashed changes
   },
 ];
 
@@ -119,7 +151,22 @@ const citationsStress: Scenario = [
   {
     kind: 'answer',
     text: 'Here is a synthesis drawn from a **50-document corpus** — the point here is navigation, so the citations jump around on purpose.\n\nThe headline series sits near its five-year median [3], though the fee data tells a different story [17]. Rate dispersion is widest in the upper band [8], and the pattern repeats across the quarterly cuts [23]. The checklist docs [11] and [29] both flag quarter-over-quarter moves beyond their thresholds — compare them against the summary in [36].\n\nThe tail of the corpus is where the caveats live: methodology notes [42], the confidence table [47], and the final reconciliation [50].\n\nJump between [3] and [50] to feel the navigation.',
+<<<<<<< Updated upstream
     sources: makeStressSources(50),
+=======
+    sources: stressSources,
+    highlights: sourceHighlights(stressSources, [
+      { referenceNumber: 3, phrase: 'generated reference documents in the stress-test corpus' },
+      { referenceNumber: 8, phrase: 'This working note supports answer marker' },
+      { referenceNumber: 8, phrase: 'generated reference documents in the stress-test corpus' },
+      { referenceNumber: 50, phrase: 'This working note supports answer marker' },
+    ]),
+    followups: [
+      'Summarize just the tail documents',
+      'Which of these docs disagree with each other?',
+      'Show me the methodology notes',
+    ],
+>>>>>>> Stashed changes
   },
 ];
 
