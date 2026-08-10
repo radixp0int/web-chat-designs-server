@@ -74,6 +74,13 @@ export interface SummaryEvent extends StreamComplete {
   type: 'summary';
   /** References backing this answer, resolved by their inline [n] markers. */
   sources?: WSSource[];
+<<<<<<< Updated upstream
+=======
+  /** Passages to highlight in the cited source docs, keyed by referenceNumber. */
+  highlights?: WSHighlight[];
+  /** Suggested next prompts, phrased as the user would type them. */
+  followups?: string[];
+>>>>>>> Stashed changes
 }
 
 /** Where a tool call is in its life. */
