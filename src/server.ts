@@ -77,4 +77,6 @@ wss.on('connection', (socket: WebSocket) => {
 });
 
 console.log(`Mock LLM WebSocket server listening on ws://localhost:${PORT}`);
-console.log('Prompt keywords: "error" (fatal error), "fail" (tool failure), "tool"/"market" (tool-heavy)');
+console.log(
+  'Prompt keywords: "degraded", "error", "fail", "50"/"stress", "cite"/"source", "tool"/"market" — see README',
+);

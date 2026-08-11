@@ -1,15 +1,17 @@
 // Canned demo scenarios, themed to match the chat-interfaces "Aristotle"
 // finance assistant. pickScenario routes on keywords in the prompt so the
-// demo can show off specific flows on cue:
+// demo can show off specific flows on cue. Listed in evaluation order — the
+// first match wins, so "error" beats "fail" and "source" beats "search":
 //
 //   "degraded"/"issues"    → answers fine, but reports several non-fatal
 //                            problems on the summary (plus one streamed, to
 //                            exercise dedupe by code)
 //   "error"                → stream dies mid-answer with a fatal error event
 //   "fail"                 → a tool call fails, the model recovers and answers
-//   "tool"/"search"/"rate" → two sequential tool calls before the answer
 //   "50"/"stress"          → an answer citing 50 references (scale test)
 //   "cite"/"source"/"save" → an answer citing a handful of references
+//   "tool"/"search"/"rate"/"market"
+//                          → two sequential tool calls before the answer
 //   anything else          → cycles through the default scenarios
 
 import { financeSources, sourceHighlights, stressSources } from './citations.ts';
