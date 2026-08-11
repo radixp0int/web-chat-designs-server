@@ -53,6 +53,46 @@ export interface WSSource {
   markdown: string;
 }
 
+/** One passage to highlight, as character offsets into the source document's
+ *  markdown. `idx` is a stable per-section id (not a reference), used only as a
+ *  key. */
+export interface WSHighlightSection {
+  idx: number;
+  start: number;
+  end: number;
+}
+
+/** The passages of a cited source to highlight. `referenceNumber` is the source
+ *  id (the [n] marker the chip shows); opening that reference highlights every
+ *  section here. One source can own several sections. */
+export interface WSHighlight {
+  referenceNumber: number;
+  sections: WSHighlightSection[];
+}
+
+/**
+ * One problem reported during a turn. Sent two ways, and the client merges
+ * both: streamed as an `error` event the moment it happens (which is what gives
+ * it a position on the turn's timeline), or listed on the `summary` event when
+ * the server only tallies problems once the answer is done.
+ *
+ * `code` is the identity used to dedupe a fault reported by both routes.
+ */
+export interface WSTurnError {
+  /** Plain language description of the problem. */
+  message: string;
+  /** True if the stream kept going, false if it is dead. */
+  recoverable: boolean;
+  /** Optional short code you can switch on in code. */
+  code?: string;
+  /** Which part of the turn it came from — 'retrieval', 'tool:live_quote'. */
+  source?: string;
+  /** Times it occurred, when the server collapses repeats. */
+  count?: number;
+  /** Structured payload for debugging; shown as JSON when the row expands. */
+  detail?: Record<string, unknown>;
+}
+
 /** A small chunk of the final answer. */
 export interface TokenEvent extends StreamChunk {
   type: 'token';
@@ -74,13 +114,17 @@ export interface SummaryEvent extends StreamComplete {
   type: 'summary';
   /** References backing this answer, resolved by their inline [n] markers. */
   sources?: WSSource[];
-<<<<<<< Updated upstream
-=======
   /** Passages to highlight in the cited source docs, keyed by referenceNumber. */
   highlights?: WSHighlight[];
   /** Suggested next prompts, phrased as the user would type them. */
   followups?: string[];
->>>>>>> Stashed changes
+  /** Which model produced the answer. Shown in the turn's trace. */
+  model?: string;
+  /** Tokens the answer cost. Shown in the turn's trace. */
+  tokens?: number;
+  /** Problems reported with the finished answer rather than as they happened.
+   *  These carry no timing — the client renders them after the timed steps. */
+  errors?: WSTurnError[];
 }
 
 /** Where a tool call is in its life. */
@@ -103,15 +147,9 @@ export interface ToolEvent extends WSEventBase {
   error?: string;
 }
 
-/** Something went wrong. */
-export interface ErrorEvent extends WSEventBase {
+/** Something went wrong, reported the moment it happens. */
+export interface ErrorEvent extends WSEventBase, WSTurnError {
   type: 'error';
-  /** Plain language description of the problem. */
-  message: string;
-  /** Optional short code you can switch on in code. */
-  code?: string;
-  /** True if the stream can keep going, false if it is dead. */
-  recoverable: boolean;
 }
 
 /** Any event that can come across the socket. */

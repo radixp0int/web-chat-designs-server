@@ -4,7 +4,7 @@
 // chunks, monotonic per-stream chunk indexes, and timestamps. Scenarios stay
 // declarative — just text and tool descriptions.
 
-import type { ToolStatus, WSEvent, WSSource } from './types.ts';
+import type { ToolStatus, WSEvent, WSHighlight, WSSource, WSTurnError } from './types.ts';
 
 /** One step of a scenario, in the order it should play out. */
 export type ScenarioStep =
@@ -25,17 +25,19 @@ export type ScenarioStep =
       text: string;
       /** Reference docs cited by this answer; delivered on the summary event. */
       sources?: WSSource[];
-<<<<<<< Updated upstream
-=======
       /** Supporting passages to highlight on citation click; each section's
        *  offsets index its own source markdown (keyed by referenceNumber). */
       highlights?: WSHighlight[];
       /** Suggested next prompts, phrased as the user would type them;
        *  delivered on the summary event. */
       followups?: string[];
->>>>>>> Stashed changes
+      /** Problems reported *with* the answer rather than as they happen — the
+       *  shape a server that only tallies failures at the end produces. They
+       *  reach the client without timing, so the trace lists them after the
+       *  timed steps. */
+      errors?: WSTurnError[];
     }
-  | { kind: 'error'; message: string; code?: string; recoverable: boolean };
+  | ({ kind: 'error' } & WSTurnError);
 
 export type Scenario = ScenarioStep[];
 
@@ -99,11 +101,9 @@ export async function runScenario(
   const thoughtParts: string[] = [];
   const answerParts: string[] = [];
   const answerSources: WSSource[] = [];
-<<<<<<< Updated upstream
-=======
   const answerHighlights: WSHighlight[] = [];
   const answerFollowups: string[] = [];
->>>>>>> Stashed changes
+  const answerErrors: WSTurnError[] = [];
 
   try {
     await sleep(jitter(PACING.beforeFirstEvent), signal);
@@ -150,23 +150,18 @@ export async function runScenario(
           }
           answerParts.push(step.text);
           if (step.sources) answerSources.push(...step.sources);
-<<<<<<< Updated upstream
-=======
           // Highlight offsets index each source's own markdown, so they pass
           // through as-is (no answer-relative shift).
           if (step.highlights) answerHighlights.push(...step.highlights);
           if (step.followups) answerFollowups.push(...step.followups);
->>>>>>> Stashed changes
+          if (step.errors) answerErrors.push(...step.errors);
           break;
         }
         case 'error': {
-          send({
-            type: 'error',
-            message: step.message,
-            code: step.code,
-            recoverable: step.recoverable,
-            ...base(),
-          });
+          // The step *is* the fault, minus its discriminant — so source, count
+          // and detail travel without being listed one by one here.
+          const { kind: _kind, ...fault } = step;
+          send({ type: 'error', ...fault, ...base() });
           if (!step.recoverable) return;
           break;
         }
@@ -183,11 +178,9 @@ export async function runScenario(
         type: 'summary',
         text: answerParts.join(''),
         sources: answerSources.length ? answerSources : undefined,
-<<<<<<< Updated upstream
-=======
         highlights: answerHighlights.length ? answerHighlights : undefined,
         followups: answerFollowups.length ? answerFollowups : undefined,
->>>>>>> Stashed changes
+        errors: answerErrors.length ? answerErrors : undefined,
         ...base(),
       });
     }

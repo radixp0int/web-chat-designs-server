@@ -2,6 +2,9 @@
 // finance assistant. pickScenario routes on keywords in the prompt so the
 // demo can show off specific flows on cue:
 //
+//   "degraded"/"issues"    → answers fine, but reports several non-fatal
+//                            problems on the summary (plus one streamed, to
+//                            exercise dedupe by code)
 //   "error"                → stream dies mid-answer with a fatal error event
 //   "fail"                 → a tool call fails, the model recovers and answers
 //   "tool"/"search"/"rate" → two sequential tool calls before the answer
@@ -9,7 +12,7 @@
 //   "cite"/"source"/"save" → an answer citing a handful of references
 //   anything else          → cycles through the default scenarios
 
-import { financeSources, makeStressSources } from './citations.ts';
+import { financeSources, sourceHighlights, stressSources } from './citations.ts';
 import type { Scenario } from './stream.ts';
 
 const toolHeavy: Scenario = [
@@ -120,8 +123,6 @@ const citations: Scenario = [
     kind: 'answer',
     text: 'Here is a straightforward way to think about it.\n\nAutomating a transfer on payday matters more than the exact amount [3], because consistency beats optimization at this stage. A practical split many people use:\n\n1. Keep one month of expenses in checking as a buffer [1].\n2. Direct new savings to a high-yield account until you reach your target — rates vary widely between providers [2].\n3. Only after that, route the overflow toward investing or extra debt payments [4].\n\nMost people land on a three-to-six-month emergency fund [1]. Tell me your monthly surplus and I can turn this into a schedule.',
     sources: financeSources,
-<<<<<<< Updated upstream
-=======
     // Offsets index each source's own markdown. Reference 1 gets two sections
     // to show one source highlighting multiple passages.
     highlights: sourceHighlights(financeSources, [
@@ -137,7 +138,6 @@ const citations: Scenario = [
       'How do I pick a high-yield account?',
       'What counts as an emergency?',
     ],
->>>>>>> Stashed changes
   },
 ];
 
@@ -151,9 +151,6 @@ const citationsStress: Scenario = [
   {
     kind: 'answer',
     text: 'Here is a synthesis drawn from a **50-document corpus** — the point here is navigation, so the citations jump around on purpose.\n\nThe headline series sits near its five-year median [3], though the fee data tells a different story [17]. Rate dispersion is widest in the upper band [8], and the pattern repeats across the quarterly cuts [23]. The checklist docs [11] and [29] both flag quarter-over-quarter moves beyond their thresholds — compare them against the summary in [36].\n\nThe tail of the corpus is where the caveats live: methodology notes [42], the confidence table [47], and the final reconciliation [50].\n\nJump between [3] and [50] to feel the navigation.',
-<<<<<<< Updated upstream
-    sources: makeStressSources(50),
-=======
     sources: stressSources,
     highlights: sourceHighlights(stressSources, [
       { referenceNumber: 3, phrase: 'generated reference documents in the stress-test corpus' },
@@ -166,7 +163,57 @@ const citationsStress: Scenario = [
       'Which of these docs disagree with each other?',
       'Show me the methodology notes',
     ],
->>>>>>> Stashed changes
+  },
+];
+
+// Several non-fatal problems reported *with* the finished answer — the shape a
+// real backend produces when it tallies failures at the end rather than
+// streaming them. RETRIEVAL_TIMEOUT is deliberately emitted twice: once as a
+// streamed event (so it earns a timestamp) and again in the summary list, to
+// prove the client dedupes on `code` and keeps the timed copy.
+const degraded: Scenario = [
+  {
+    kind: 'thinking',
+    text: 'Several subsystems are degraded, but I have enough to answer. The point of this turn is that the answer still lands — the problems belong in the trace, not in the reader’s face.',
+  },
+  {
+    kind: 'error',
+    message: 'Vector store timed out, fell back to keyword search',
+    code: 'RETRIEVAL_TIMEOUT',
+    source: 'retrieval',
+    count: 2,
+    detail: { attempts: 2, timeoutMs: 5000, fallback: 'bm25' },
+    recoverable: true,
+  },
+  {
+    kind: 'answer',
+    text: 'Here is the answer, assembled from a degraded pipeline.\n\nEverything below is accurate, but a few subsystems were unavailable while it was produced. None of that changed the substance of the answer, so none of it is shown inline — open the duration under this message to see exactly what happened and when.\n\nTwo of the problems were reported as they occurred, so they carry timestamps. The rest were only tallied once the answer finished, so they appear underneath without one.',
+    errors: [
+      {
+        message: 'Vector store timed out, fell back to keyword search',
+        code: 'RETRIEVAL_TIMEOUT',
+        source: 'retrieval',
+        recoverable: true,
+      },
+      {
+        message: 'Reranker unavailable, results returned unranked',
+        code: 'RERANK_SKIPPED',
+        source: 'rerank',
+        recoverable: true,
+      },
+      {
+        message: 'Cache miss on 3 of 5 shards',
+        code: 'CACHE_PARTIAL',
+        source: 'cache',
+        count: 3,
+        detail: { shards: ['a', 'c', 'e'], hitRate: 0.4 },
+        recoverable: true,
+      },
+    ],
+    followups: [
+      'Which parts of that answer are least reliable?',
+      'Re-run it once retrieval is healthy',
+    ],
   },
 ];
 
@@ -175,6 +222,7 @@ let defaultIndex = 0;
 
 /** Routes a prompt to a scenario. Keyword triggers beat the default cycle. */
 export function pickScenario(prompt: string): Scenario {
+  if (/degraded|partial|unhealthy|issues/i.test(prompt)) return degraded;
   if (/error/i.test(prompt)) return fatalError;
   if (/fail/i.test(prompt)) return toolFailure;
   if (/\b50\b|stress|many ref|lots of ref/i.test(prompt)) return citationsStress;

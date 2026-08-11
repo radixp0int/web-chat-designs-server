@@ -1,0 +1,4 @@
+# Last gate before the markers can reach a shared branch. The conflict check
+# repeats here because a commit made with --no-verify still has to pass this.
+sh scripts/no-conflict-markers.sh
+npm run typecheck
