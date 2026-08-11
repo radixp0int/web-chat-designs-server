@@ -3,7 +3,7 @@
 // originate server-side. Inline [n] markers in the answer text resolve to a
 // source `id` here.
 
-import type { WSSource } from './types.ts';
+import type { WSHighlight, WSSource } from './types.ts';
 
 /** A small finance corpus for the citations demo answer. */
 export const financeSources: WSSource[] = [
@@ -116,4 +116,38 @@ This working note supports answer marker [${id}]. The ${topic.toLowerCase()} ser
       markdown: `## ${topic} — working paper ${id}\n\nOne of ${count} generated reference documents in the stress-test corpus.\n\n${body}`,
     };
   });
+}
+
+/** The stress corpus as a single shared array. The answer that cites it and the
+ *  highlights that index it must be the *same* docs — building it twice would
+ *  leave the offsets resolving against a different array than the one sent. */
+export const stressSources: WSSource[] = makeStressSources(50);
+
+/**
+ * Authoring helper for the scenarios: turns `{ referenceNumber, phrase }` specs
+ * into the nested highlight shape by locating each phrase in the matching
+ * source's markdown (the source whose `id` equals `referenceNumber`). Sections
+ * are grouped by `referenceNumber` and each gets a unique running `idx`. Keeps
+ * mock offsets correct without hand-counting; unfound phrases are skipped.
+ *
+ * Mirrors `sourceHighlights` in the client's src/lib/highlights.ts — offsets
+ * index the source's own markdown, so they cross the wire unchanged.
+ */
+export function sourceHighlights(
+  sources: WSSource[],
+  specs: { referenceNumber: number; phrase: string }[],
+): WSHighlight[] {
+  const groups = new Map<number, WSHighlight>();
+  let idx = 1;
+  for (const { referenceNumber, phrase } of specs) {
+    const source = sources.find((s) => s.id === referenceNumber);
+    if (!source) continue;
+    const start = source.markdown.indexOf(phrase);
+    if (start === -1) continue;
+    const section = { idx: idx++, start, end: start + phrase.length };
+    const group = groups.get(referenceNumber);
+    if (group) group.sections.push(section);
+    else groups.set(referenceNumber, { referenceNumber, sections: [section] });
+  }
+  return [...groups.values()];
 }
