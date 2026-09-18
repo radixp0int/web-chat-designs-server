@@ -32,13 +32,20 @@ matches wins.**
 
 | Prompt contains | Scenario |
 | --- | --- |
-| `degraded`, `partial`, `unhealthy`, `issues` | Answers fine; one streamed fault plus three tallied on the summary, one code sent by both routes |
-| `error` | Answer dies mid-stream with a fatal error event (`UPSTREAM_UNAVAILABLE`) |
-| `fail` | A tool call fails, the model recovers via a second tool and answers |
-| `50` (standalone), `stress`, `many ref`, `lots of ref` | Answer citing a 50-document corpus, markers scattered across the range |
-| `cite`, `citation`, `reference`, `source`, `budget`, `save`/`saving` | Answer citing five references, with highlighted passages |
-| `tool`, `search`, `rate`, `market` | Two sequential successful tool calls before the answer |
+| `degraded`, `partial`, `unhealthy`, `issues` | A streamed `RETRIEVAL_TIMEOUT`, a fallback keyword search, a failed rerank call, then an answer; three problems tallied on the summary, one code (`RETRIEVAL_TIMEOUT`) sent by both routes |
+| `error` | Two tool calls succeed (positions, cost basis), the answer starts, then the stream dies mid-answer with a fatal error event (`UPSTREAM_UNAVAILABLE`) |
+| `fail` | Two quote sources fail in sequence, a cached quote succeeds and gets range-checked, the model recovers and answers |
+| `50` (standalone), `stress`, `many ref`, `lots of ref` | A corpus-ranking tool call, then an answer citing a 50-document corpus, markers scattered across the range |
+| `cite`, `citation`, `reference`, `source`, `budget`, `save`/`saving` | A reference-search tool call, then an answer citing five references, with highlighted passages |
+| `tool`, `search`, `rate`, `market` | Four sequential tool calls (rates, index moves, volatility, account allocation) before the answer |
 | anything else | Cycles the default scenarios (tool-heavy ↔ plain) |
+
+Every scenario runs several `thinking` steps — the model reacting to each tool
+result in turn rather than deciding everything up front in one paragraph —
+interleaved with however many tool calls its story needs. The tool-heavy
+scenarios run 4–6 thinking steps; `plain` runs 3 with no tool calls at all,
+since forcing a tool into a pure conceptual question would be dishonest about
+what real models do.
 
 Two collisions to know about: `error` is tested before `fail`, and `source`
 beats `search`.
