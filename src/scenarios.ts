@@ -5,14 +5,28 @@
 //
 //   "degraded"/"issues"    → answers fine, but reports several non-fatal
 //                            problems on the summary (plus one streamed, to
-//                            exercise dedupe by code)
-//   "error"                → stream dies mid-answer with a fatal error event
-//   "fail"                 → a tool call fails, the model recovers and answers
-//   "50"/"stress"          → an answer citing 50 references (scale test)
-//   "cite"/"source"/"save" → an answer citing a handful of references
+//                            exercise dedupe by code) after a fallback search
+//                            and a failed rerank attempt
+//   "error"                → two tool calls succeed, then the stream dies
+//                            mid-answer with a fatal error event
+//   "fail"                 → two quote sources fail before a cached one
+//                            succeeds and gets range-checked; the model
+//                            recovers and answers
+//   "50"/"stress"          → a corpus is ranked, then an answer citing 50
+//                            references (scale test)
+//   "cite"/"source"/"save" → a corpus is searched, then an answer citing a
+//                            handful of references
 //   "tool"/"search"/"rate"/"market"
-//                          → two sequential tool calls before the answer
+//                          → four sequential tool calls (rates, index moves,
+//                            volatility, allocation) before the answer
 //   anything else          → cycles through the default scenarios
+//
+// Every scenario below runs 4–6 `thinking` steps — the model reacting to
+// each tool result in turn, not one paragraph decided up front — interleaved
+// with however many tool calls its story needs. `runScenario` folds all of
+// it into one `thought` block and reactivates the reasoning shimmer each
+// time thinking resumes after a tool call, so none of this needs any
+// client-side support beyond what already exists.
 
 import { financeSources, sourceHighlights, stressSources } from './citations.ts';
 import type { Scenario } from './stream.ts';
@@ -20,7 +34,7 @@ import type { Scenario } from './stream.ts';
 const toolHeavy: Scenario = [
   {
     kind: 'thinking',
-    text: 'The user wants current market context. I should pull fresh numbers rather than rely on stale training data — one call for benchmark rates, one for the equity snapshot, then synthesize.',
+    text: 'The user wants current market context, and I don’t want to lean on training data that could be a quarter stale. I’ll start with the two headline benchmarks — the fed funds rate and the 10-year — since most of a rate conversation hangs off those two numbers.',
   },
   {
     kind: 'tool',
@@ -30,6 +44,10 @@ const toolHeavy: Scenario = [
     durationMs: 900,
   },
   {
+    kind: 'thinking',
+    text: 'Rates alone don’t tell the whole story — I should see how equities and bonds have actually behaved over the same window, otherwise I’m reasoning about the curve in a vacuum.',
+  },
+  {
     kind: 'tool',
     name: 'market_snapshot',
     input: { symbols: ['SPY', 'AGG'], window: '1M' },
@@ -37,12 +55,38 @@ const toolHeavy: Scenario = [
     durationMs: 1100,
   },
   {
+    kind: 'thinking',
+    text: 'Rates are calm and both asset classes are up, but a quiet macro backdrop with a spiky volatility print tells a different story than a genuinely calm market — worth checking before I lean on this rally.',
+  },
+  {
+    kind: 'tool',
+    name: 'volatility_snapshot',
+    input: { index: 'VIX', window: '1M' },
+    output: { level: 14.2, pct_change_30d: -8.1, regime: 'below_average' },
+    durationMs: 650,
+  },
+  {
+    kind: 'thinking',
+    text: 'Volatility is below its trailing average, so this isn’t nerves propping up a fragile rally. I don’t know their current mix though, and I’d rather confirm it than assume a generic 60/40 — a rebalancing answer built on a guess isn’t worth much.',
+  },
+  {
+    kind: 'tool',
+    name: 'get_account_allocation',
+    input: { account_id: 'demo-001' },
+    output: { equities_pct: 62, bonds_pct: 33, cash_pct: 5, last_updated: '2026-07-01' },
+    durationMs: 750,
+  },
+  {
+    kind: 'thinking',
+    text: 'They’re already close to a textbook 70/30, just carrying a bit more cash than that model calls for. Given the calm backdrop I can frame this as confirming their existing mix rather than prescribing a new one, with the cash cushion as an optional nudge, not an urgent fix.',
+  },
+  {
     kind: 'answer',
-    text: 'Here is where things stand as of yesterday’s close.\n\nThe fed funds rate sits at 4.25% and the 10-year Treasury yields 3.98%, so the curve remains mildly inverted at the short end. Over the past month broad equities (SPY) added about 2.4% while core bonds (AGG) gained 0.6%.\n\nFor a balanced portfolio that mix argues for staying the course: equities are doing the growth work while bonds are finally paying you to wait. If you tell me your current allocation, I can sketch what a rebalance would look like.',
+    text: 'Here is where things stand as of yesterday’s close, along with a look at what’s on your books.\n\nThe fed funds rate sits at 4.25% and the 10-year Treasury yields 3.98%, so the curve remains mildly inverted at the short end. Over the past month broad equities (SPY) added about 2.4% while core bonds (AGG) gained 0.6% — and volatility has actually eased, with the VIX down about 8% over the same window and sitting below its trailing average. This isn’t a fragile rally propped up by calm nerves; it’s a genuinely quiet market.\n\nYour account is currently 62% equities, 33% bonds, and 5% cash — close to a classic 70/30 stock-bond split, just carrying a bit more cash cushion than that model calls for. Given the calm backdrop and the inverted short end, there’s no urgency to rebalance, but if you wanted to inch toward 70/30 the difference would come from trimming cash rather than selling equities into strength.',
     followups: [
-      'I’m at 70% stocks and 30% bonds — what should I rebalance?',
+      'Turn that into a specific trade list',
       'Why is the curve still inverted?',
-      'Is it worth locking in the 10-year now?',
+      'Should I be worried about the extra cash cushion?',
     ],
   },
 ];
@@ -50,7 +94,15 @@ const toolHeavy: Scenario = [
 const plain: Scenario = [
   {
     kind: 'thinking',
-    text: 'This is a conceptual question — no live data needed. I want to explain compounding with one concrete, memorable example and keep the math light. A single doubling illustration should land better than a formula.',
+    text: 'This is a conceptual question — no live data needed. I want to explain compounding with one concrete, memorable example rather than lead with a formula, since a formula is easy to nod along to and forget by lunch.',
+  },
+  {
+    kind: 'thinking',
+    text: 'A round starting balance and a realistic long-run return will make the comparison feel earned rather than cherry-picked. I’ll contrast a 10-year and a 30-year horizon so the acceleration is actually visible instead of asserted.',
+  },
+  {
+    kind: 'thinking',
+    text: 'One more thing worth landing: the point isn’t the exact dollar figures, it’s that the later decade does more work than the earlier ones combined — that’s the part people underestimate, and the part that should change behavior today.',
   },
   {
     kind: 'answer',
@@ -66,7 +118,7 @@ const plain: Scenario = [
 const toolFailure: Scenario = [
   {
     kind: 'thinking',
-    text: 'They asked for live pricing, so I’ll hit the quote service first. If that fails I can fall back to the most recent cached close and be transparent about the staleness.',
+    text: 'They asked for live pricing, so I’ll hit the primary quote service first rather than reasoning from a stale number.',
   },
   {
     kind: 'tool',
@@ -78,7 +130,19 @@ const toolFailure: Scenario = [
   },
   {
     kind: 'thinking',
-    text: 'The live feed timed out. Falling back to the cached end-of-day snapshot — still useful, just needs a caveat.',
+    text: 'That’s the primary feed down. Before I give up on real-time entirely, there’s a secondary quote provider worth trying — different infrastructure, so it’s not guaranteed to be having the same bad day.',
+  },
+  {
+    kind: 'tool',
+    name: 'backup_quote_feed',
+    input: { symbol: 'VTI' },
+    outcome: 'failed',
+    error: 'Backup feed rate-limited: too many requests in the last 60s',
+    durationMs: 600,
+  },
+  {
+    kind: 'thinking',
+    text: 'Two live sources down. Falling back to the most recent verified close — still useful for allocation math, it just needs an honest staleness caveat rather than being presented as current.',
   },
   {
     kind: 'tool',
@@ -88,11 +152,27 @@ const toolFailure: Scenario = [
     durationMs: 500,
   },
   {
+    kind: 'thinking',
+    text: 'Before I hand back a cached number, a quick sanity check against the recent trading range — I don’t want to repeat a stale or corrupted print without noticing.',
+  },
+  {
+    kind: 'tool',
+    name: 'verify_price_range',
+    input: { symbol: 'VTI', candidate: 289.44, expected_range: [270, 310] },
+    output: { within_range: true, deviation_pct: 0 },
+    durationMs: 400,
+  },
+  {
+    kind: 'thinking',
+    text: 'The cached print checks out against the expected range, so I can hand it back with confidence — just leading with the caveat so it can’t be missed.',
+  },
+  {
     kind: 'answer',
-    text: 'The live quote service timed out on me, so this is the latest cached close rather than a real-time price: VTI last traded at $289.44 as of yesterday’s market close.\n\nFor deciding whether to place a market order right now you’d want a fresh quote from your brokerage, but for allocation math a day-old close is more than accurate enough.',
+    text: 'The live quote service timed out on me, and the backup feed was rate-limited, so this is the latest verified cached close rather than a real-time price: VTI last traded at $289.44 as of yesterday’s market close, and it checks out against its recent trading range.\n\nFor deciding whether to place a market order right now you’d want a fresh quote from your brokerage, but for allocation math a day-old, range-verified close is more than accurate enough.',
     followups: [
       'Try the live quote again',
       'How stale is too stale for allocation math?',
+      'What’s VTI’s range been over the past month?',
     ],
   },
 ];
@@ -100,11 +180,33 @@ const toolFailure: Scenario = [
 const fatalError: Scenario = [
   {
     kind: 'thinking',
-    text: 'Pulling together the full portfolio review — positions, cost basis, and dividend history. This needs the account data service.',
+    text: 'Pulling together the full portfolio review — positions, cost basis, and dividend history. I’ll start with positions and cost basis since those calls are quick and cache-friendly, then layer in dividend history last since that endpoint is historically the flakiest of the three.',
+  },
+  {
+    kind: 'tool',
+    name: 'get_account_positions',
+    input: { account_id: 'demo-001' },
+    output: { positions: 14, largest_weight_pct: 18.5 },
+    durationMs: 600,
+  },
+  {
+    kind: 'thinking',
+    text: 'Positions came back clean. Cost basis next — I want unrealized gain/loss context in hand before I say anything that touches on tax implications.',
+  },
+  {
+    kind: 'tool',
+    name: 'get_cost_basis',
+    input: { account_id: 'demo-001' },
+    output: { unrealized_gain_pct: 12.4, lots: 37 },
+    durationMs: 700,
+  },
+  {
+    kind: 'thinking',
+    text: 'Both core datasets are in. Dividend history is the last piece, and the one call in this chain I’d least like to depend on — I’ll start writing the review now and fold it in once it lands.',
   },
   {
     kind: 'answer',
-    text: 'Starting your portfolio review now. Pulling your current positions and',
+    text: 'Starting your portfolio review now. I already have your positions and cost basis pulled — checking dividend history and',
   },
   {
     kind: 'error',
@@ -119,7 +221,21 @@ const fatalError: Scenario = [
 const citations: Scenario = [
   {
     kind: 'thinking',
-    text: 'The user is asking a personal-finance planning question. I should ground each claim in a specific reference so the answer is auditable, and keep the split simple.',
+    text: 'The user is asking a personal-finance planning question. I should ground each claim in a specific reference so the answer is auditable, rather than asserting a split from memory — let me search the reference corpus for what actually backs this up.',
+  },
+  {
+    kind: 'tool',
+    name: 'search_reference_corpus',
+    input: {
+      query: 'emergency fund sizing, high-yield savings rates, automation, debt vs saving order',
+      k: 4,
+    },
+    output: { matched_ids: [1, 2, 3, 4], top_score: 0.86 },
+    durationMs: 550,
+  },
+  {
+    kind: 'thinking',
+    text: 'Four solid matches with good coverage across sizing, rates, automation, and sequencing. I’ll keep the split simple and cite each one only where it directly supports a claim, rather than dropping all four references up front.',
   },
   {
     kind: 'answer',
@@ -148,7 +264,21 @@ const citations: Scenario = [
 const citationsStress: Scenario = [
   {
     kind: 'thinking',
-    text: 'The user wants to see how the reference UI behaves with a large corpus. I will cite documents scattered across the full range — low, middle, and high numbers — so jumping between distant references gets exercised.',
+    text: 'The user wants to see how the reference UI behaves with a large corpus. Before I write anything, I should rank the full 50-document set against the question rather than skim the first handful — the point here is navigation, so I want citations that genuinely span the range.',
+  },
+  {
+    kind: 'tool',
+    name: 'rank_corpus_documents',
+    input: {
+      corpus_size: 50,
+      query: 'headline series vs fee data vs rate dispersion across quarterly cuts',
+    },
+    output: { returned: 50, method: 'full_scan', top_score: 0.79 },
+    durationMs: 900,
+  },
+  {
+    kind: 'thinking',
+    text: 'The ranking confirms relevant material at both ends of the corpus, not just near the top — good, that means I can cite low, middle, and high document numbers honestly rather than forcing the spread for effect.',
   },
   {
     kind: 'answer',
@@ -172,11 +302,13 @@ const citationsStress: Scenario = [
 // real backend produces when it tallies failures at the end rather than
 // streaming them. RETRIEVAL_TIMEOUT is deliberately emitted twice: once as a
 // streamed event (so it earns a timestamp) and again in the summary list, to
-// prove the client dedupes on `code` and keeps the timed copy.
+// prove the client dedupes on `code` and keeps the timed copy. The keyword
+// fallback and failed rerank below aren't decoration — they're the tool calls
+// that produced RETRIEVAL_TIMEOUT and RERANK_SKIPPED in the first place.
 const degraded: Scenario = [
   {
     kind: 'thinking',
-    text: 'Several subsystems are degraded, but I have enough to answer. The point of this turn is that the answer still lands — the problems belong in the trace, not in the reader’s face.',
+    text: 'Kicking off retrieval for this one — nothing unusual yet, but I’ll keep an eye on latency since the vector store has been inconsistent today.',
   },
   {
     kind: 'error',
@@ -188,8 +320,35 @@ const degraded: Scenario = [
     recoverable: true,
   },
   {
+    kind: 'thinking',
+    text: 'The vector store timed out twice — not worth a third attempt. Keyword search won’t rank as well, but it’ll surface something usable, and I can be upfront about the tradeoff.',
+  },
+  {
+    kind: 'tool',
+    name: 'keyword_fallback_search',
+    input: { query: 'degraded pipeline demo answer', mode: 'bm25' },
+    output: { hits: 42, top_score: 0.71 },
+    durationMs: 500,
+  },
+  {
+    kind: 'thinking',
+    text: 'Forty-two keyword hits — enough to work with, but unranked results are noisier than a proper semantic search. Worth trying to rerank before I commit to an ordering, even though the reranker has also been flaky today.',
+  },
+  {
+    kind: 'tool',
+    name: 'rerank_passages',
+    input: { candidate_count: 42, model: 'cross-encoder-v2' },
+    outcome: 'failed',
+    error: 'Reranker service unavailable: connection refused',
+    durationMs: 350,
+  },
+  {
+    kind: 'thinking',
+    text: 'Reranker’s down too. I have enough signal in the unranked keyword hits to answer accurately — the ordering would have been a nice-to-have, not a correctness issue, so I’ll proceed rather than block on it.',
+  },
+  {
     kind: 'answer',
-    text: 'Here is the answer, assembled from a degraded pipeline.\n\nEverything below is accurate, but a few subsystems were unavailable while it was produced. None of that changed the substance of the answer, so none of it is shown inline — open the duration under this message to see exactly what happened and when.\n\nTwo of the problems were reported as they occurred, so they carry timestamps. The rest were only tallied once the answer finished, so they appear underneath without one.',
+    text: 'Here is the answer, assembled from a degraded pipeline that fell back to keyword search and had to skip reranking along the way.\n\nEverything below is accurate, but a few subsystems were unavailable while it was produced. None of that changed the substance of the answer, so none of it is shown inline — open the duration under this message to see exactly what happened and when.\n\nTwo of the problems were reported as they occurred, so they carry timestamps. The rest were only tallied once the answer finished, so they appear underneath without one.',
     errors: [
       {
         message: 'Vector store timed out, fell back to keyword search',
